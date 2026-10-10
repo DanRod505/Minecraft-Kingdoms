@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "E": "minecraft:emerald",
+    "G": "minecraft:gold_ingot",
+    "S": "minecraft:stick"
+  },
+  "pattern": [
+    " E ",
+    " G ",
+    " S "
+  ],
+  "result": {
+    "count": 1,
+    "id": "kingdoms:royal_scepter"
+  }
+}

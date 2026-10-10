@@ -2,10 +2,13 @@ package dev.kingdoms.world;
 
 import dev.kingdoms.core.KingdomsConfig;
 import dev.kingdoms.core.KingdomsLog;
+import dev.kingdoms.core.KingdomsRegistry;
+import dev.kingdoms.entity.Materializer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 import java.util.UUID;
@@ -39,14 +42,20 @@ public final class KingdomService {
         state(player.level().getServer()).checkFound(player.getUUID(), name, dimension(player.level()), pos.getX(), pos.getZ());
     }
 
+    /** Founds a kingdom for a player, who also gets a Royal Scepter to give orders with. */
     public static Kingdom found(ServerPlayer player, String name, BlockPos pos) {
-        return found(player.level().getServer(), player.getUUID(), name, player.level(), pos);
+        var kingdom = found(player.level().getServer(), player.getUUID(), name, player.level(), pos);
+        var scepter = new ItemStack(KingdomsRegistry.ROYAL_SCEPTER.get());
+        if (!player.getInventory().add(scepter))
+            player.drop(scepter, false);
+        return kingdom;
     }
 
     public static Kingdom found(MinecraftServer server, UUID ruler, String name, Level level, BlockPos pos) {
         var kingdom = change(server, s -> s.found(ruler, name, dimension(level), pos.getX(), pos.getY(), pos.getZ(),
             level.getGameTime(), KingdomsConfig.rules()));
         KingdomsLog.LOGGER.info("Kingdom {} ({}) founded by {} at {} in {}", kingdom.name(), kingdom.id(), ruler, pos.toShortString(), dimension(level));
+        Materializer.materialize(server, kingdom.id());
         return kingdom;
     }
 

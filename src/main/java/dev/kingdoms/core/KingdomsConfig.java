@@ -18,6 +18,7 @@ public final class KingdomsConfig {
     public static final ForgeConfigSpec.IntValue FOUNDER_COUNT;
     public static final ForgeConfigSpec.IntValue INITIAL_CLAIM_RADIUS;
     public static final ForgeConfigSpec.IntValue MAX_CLAIMS;
+    public static final ForgeConfigSpec.IntValue MAX_ORDER_VOLUME;
 
     static {
         var common = new ForgeConfigSpec.Builder();
@@ -46,6 +47,12 @@ public final class KingdomsConfig {
             .translation("kingdoms.config.territory.max_claims")
             .defineInRange("maxClaims", KingdomRules.DEFAULT.maxClaims(), 1, 4096);
         server.pop();
+        server.push("orders");
+        MAX_ORDER_VOLUME = server
+            .comment("Maximum number of blocks in the area of one work order.")
+            .translation("kingdoms.config.orders.max_order_volume")
+            .defineInRange("maxOrderVolume", KingdomRules.DEFAULT.maxOrderVolume(), 1, 1_000_000);
+        server.pop();
         SERVER_SPEC = server.build();
     }
 
@@ -53,7 +60,7 @@ public final class KingdomsConfig {
     public static KingdomRules rules() {
         if (!SERVER_SPEC.isLoaded())
             return KingdomRules.DEFAULT;
-        return new KingdomRules(FOUNDER_COUNT.get(), INITIAL_CLAIM_RADIUS.get(), MAX_CLAIMS.get());
+        return new KingdomRules(FOUNDER_COUNT.get(), INITIAL_CLAIM_RADIUS.get(), MAX_CLAIMS.get(), MAX_ORDER_VOLUME.get());
     }
 
     private KingdomsConfig() {}

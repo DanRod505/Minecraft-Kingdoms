@@ -3,6 +3,10 @@ package dev.kingdoms.world;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import dev.kingdoms.orders.Area;
+import dev.kingdoms.orders.Order;
+import dev.kingdoms.orders.OrderStatus;
+import dev.kingdoms.orders.OrderType;
 import dev.kingdoms.territory.ChunkKey;
 import dev.kingdoms.territory.ClaimMap;
 
@@ -28,7 +32,8 @@ public final class KingdomState {
         Kingdom.CODEC.listOf().fieldOf("kingdoms").forGetter(s -> sorted(s.kingdoms.values(), Kingdom::id)),
         Settlement.CODEC.listOf().fieldOf("settlements").forGetter(s -> sorted(s.settlements.values(), Settlement::id)),
         Citizen.CODEC.listOf().fieldOf("citizens").forGetter(s -> sorted(s.citizens.values(), Citizen::id)),
-        ClaimMap.CODEC.fieldOf("claims").forGetter(s -> s.claims)
+        ClaimMap.CODEC.fieldOf("claims").forGetter(s -> s.claims),
+        Order.CODEC.listOf().fieldOf("orders").forGetter(s -> sorted(s.orders.values(), Order::id))
     ).apply(i, KingdomState::new));
     public static final Codec<KingdomState> CODEC = MAP_CODEC.codec();
 
@@ -39,14 +44,16 @@ public final class KingdomState {
     private final Map<UUID, Kingdom> kingdoms = new HashMap<>();
     private final Map<UUID, Settlement> settlements = new HashMap<>();
     private final Map<UUID, Citizen> citizens = new HashMap<>();
+    private final Map<UUID, Order> orders = new HashMap<>();
     private final ClaimMap claims;
     private Supplier<UUID> ids = UUID::randomUUID;
 
     public KingdomState() {
-        this(List.of(), List.of(), List.of(), new ClaimMap());
+        this(List.of(), List.of(), List.of(), new ClaimMap(), List.of());
     }
 
-    private KingdomState(List<Kingdom> kingdoms, List<Settlement> settlements, List<Citizen> citizens, ClaimMap claims) {
+    private KingdomState(List<Kingdom> kingdoms, List<Settlement> settlements, List<Citizen> citizens, ClaimMap claims, List<Order> orders) {
+        orders.forEach(o -> this.orders.put(o.id(), o));
         kingdoms.forEach(k -> this.kingdoms.put(k.id(), k));
         settlements.forEach(s -> this.settlements.put(s.id(), s));
         citizens.forEach(c -> this.citizens.put(c.id(), c));
@@ -106,7 +113,7 @@ public final class KingdomState {
 
         var kingdomId = ids.get();
         var capital = new Settlement(ids.get(), kingdomId, name, dimension, x, y, z, Settlement.Stage.CAMP);
-        var kingdom = new Kingdom(kingdomId, name, ruler, Emblem.DEFAULT, capital.id(), 0, gameTime);
+        var kingdom = new Kingdom(kingdomId, name, ruler, Emblem.DEFAULT, capital.id(), 0, gameTime, Optional.empty());
         kingdoms.put(kingdomId, kingdom);
         settlements.put(capital.id(), capital);
 
@@ -114,7 +121,7 @@ public final class KingdomState {
         var names = new ArrayList<>(FOUNDER_NAMES);
         for (int n = 0; n < rules.founderCount(); n++) {
             var founderName = names.isEmpty() ? "Colonist " + (n + 1) : names.remove(random.nextInt(names.size()));
-            var citizen = new Citizen(ids.get(), founderName, kingdomId, capital.id(), Citizen.Profession.NONE);
+            var citizen = new Citizen(ids.get(), founderName, kingdomId, capital.id(), Citizen.Profession.NONE, Optional.empty(), false);
             citizens.put(citizen.id(), citizen);
         }
 
@@ -217,7 +224,180 @@ public final class KingdomState {
         kingdoms.remove(kingdomId);
         settlements.values().removeIf(s -> s.kingdom().equals(kingdomId));
         citizens.values().removeIf(c -> c.kingdom().equals(kingdomId));
+        orders.values().removeIf(o -> o.kingdom().equals(kingdomId));
         claims.removeKingdom(kingdomId);
+    }
+
+    // ---- citizens and orders (Phase 2) ----
+
+    public Optional<Citizen> citizen(UUID id) {
+        return Optional.ofNullable(citizens.get(id));
+    }
+
+    public List<Citizen> citizens() {
+        return sorted(citizens.values(), Citizen::id);
+    }
+
+    public Optional<Citizen> citizenNamed(UUID kingdomId, String name) {
+        var key = normalizeName(name).toLowerCase(Locale.ROOT);
+        return citizensOf(kingdomId).stream().filter(c -> c.name().toLowerCase(Locale.ROOT).equals(key)).findFirst();
+    }
+
+    public Optional<Order> order(UUID id) {
+        return Optional.ofNullable(orders.get(id));
+    }
+
+    /** Orders of a kingdom, open ones first, then by priority (high first) and age. */
+    public List<Order> ordersOf(UUID kingdomId) {
+        var list = new ArrayList<>(orders.values().stream().filter(o -> o.kingdom().equals(kingdomId)).toList());
+        list.sort(Comparator.comparing((Order o) -> !o.status().open())
+            .thenComparing(Comparator.comparingInt(Order::priority).reversed())
+            .thenComparingLong(Order::createdAt)
+            .thenComparing(Order::id));
+        return list;
+    }
+
+    /** Finds an order of the kingdom by the start of its id, as shown to players. */
+    public Optional<Order> orderByPrefix(UUID kingdomId, String prefix) {
+        var p = prefix.toLowerCase(Locale.ROOT);
+        var matches = orders.values().stream().filter(o -> o.kingdom().equals(kingdomId) && o.id().toString().startsWith(p)).toList();
+        return matches.size() == 1 ? Optional.of(matches.getFirst()) : Optional.empty();
+    }
+
+    public List<Citizen> workersOf(UUID orderId) {
+        return sorted(citizens.values().stream().filter(c -> c.order().filter(orderId::equals).isPresent()).toList(), Citizen::name);
+    }
+
+    public void setStockpile(UUID kingdomId, BlockLocation location) {
+        var kingdom = require(kingdomId);
+        if (claims.owner(location.dimension(), ChunkKey.of(location.x() >> 4, location.z() >> 4)).filter(kingdomId::equals).isEmpty())
+            throw new KingdomException("kingdoms.error.outside_territory");
+        kingdoms.put(kingdomId, kingdom.withStockpile(Optional.of(location)));
+    }
+
+    public Citizen assignProfession(UUID kingdomId, UUID citizenId, Citizen.Profession profession) {
+        var citizen = requireCitizen(kingdomId, citizenId);
+        var updated = citizen.withProfession(profession);
+        citizens.put(citizenId, updated);
+        return updated;
+    }
+
+    /**
+     * Creates an order over an area. The whole area must lie in the kingdom's own territory (rule 20.9:
+     * workers never touch other people's land) and the kingdom needs a stockpile to deliver to.
+     */
+    public Order createOrder(UUID kingdomId, OrderType type, Area area, int priority, Optional<String> material, long gameTime, KingdomRules rules) {
+        var kingdom = require(kingdomId);
+        if (priority < Order.MIN_PRIORITY || priority > Order.MAX_PRIORITY)
+            throw new KingdomException("kingdoms.error.priority_range", Order.MIN_PRIORITY, Order.MAX_PRIORITY);
+        if (area.volume() > rules.maxOrderVolume())
+            throw new KingdomException("kingdoms.error.area_too_large", area.volume(), rules.maxOrderVolume());
+        for (int cx = area.minX() >> 4; cx <= area.maxX() >> 4; cx++)
+            for (int cz = area.minZ() >> 4; cz <= area.maxZ() >> 4; cz++)
+                if (claims.owner(area.dimension(), ChunkKey.of(cx, cz)).filter(kingdomId::equals).isEmpty())
+                    throw new KingdomException("kingdoms.error.outside_territory");
+        if (kingdom.stockpile().isEmpty())
+            throw new KingdomException("kingdoms.error.no_stockpile");
+        if (type == OrderType.BUILD && material.isEmpty())
+            throw new KingdomException("kingdoms.error.no_material");
+        var order = new Order(ids.get(), kingdomId, type, area, priority, OrderStatus.ACTIVE, Optional.empty(),
+            type == OrderType.BUILD ? material : Optional.empty(), gameTime, 0);
+        orders.put(order.id(), order);
+        return order;
+    }
+
+    /** Pausing, resuming or cancelling. Workers of a paused or cancelled order are released at once. */
+    public Order setOrderStatus(UUID kingdomId, UUID orderId, OrderStatus status) {
+        var order = requireOrder(kingdomId, orderId);
+        if (!order.status().open())
+            throw new KingdomException("kingdoms.error.order_closed");
+        var updated = order.withStatus(status);
+        orders.put(orderId, updated);
+        if (status != OrderStatus.ACTIVE)
+            releaseWorkers(orderId);
+        return updated;
+    }
+
+    public Order setOrderPriority(UUID kingdomId, UUID orderId, int priority) {
+        if (priority < Order.MIN_PRIORITY || priority > Order.MAX_PRIORITY)
+            throw new KingdomException("kingdoms.error.priority_range", Order.MIN_PRIORITY, Order.MAX_PRIORITY);
+        var updated = requireOrder(kingdomId, orderId).withPriority(priority);
+        orders.put(orderId, updated);
+        return updated;
+    }
+
+    /**
+     * Gives an idle citizen the best active order for its profession: highest priority, then oldest.
+     * Orders that are blocked are still offered, so a worker can find out the block is gone.
+     */
+    public Optional<Order> pickOrder(UUID citizenId) {
+        var citizen = citizens.get(citizenId);
+        if (citizen == null || citizen.profession() == Citizen.Profession.NONE)
+            return Optional.empty();
+        var best = ordersOf(citizen.kingdom()).stream()
+            .filter(o -> o.status() == OrderStatus.ACTIVE && o.type().profession() == citizen.profession())
+            .findFirst();
+        citizens.put(citizenId, citizen.withOrder(best.map(Order::id)));
+        return best;
+    }
+
+    /** Whether a better order than the current one exists, so the worker should replan (GDD 3.5). */
+    public boolean shouldReplan(UUID citizenId) {
+        var citizen = citizens.get(citizenId);
+        if (citizen == null || citizen.order().isEmpty())
+            return true;
+        var current = orders.get(citizen.order().get());
+        if (current == null || current.status() != OrderStatus.ACTIVE)
+            return true;
+        return ordersOf(citizen.kingdom()).stream()
+            .filter(o -> o.status() == OrderStatus.ACTIVE && o.type().profession() == citizen.profession())
+            .findFirst().map(o -> o.priority() > current.priority()).orElse(false);
+    }
+
+    public void releaseCitizen(UUID citizenId) {
+        var citizen = citizens.get(citizenId);
+        if (citizen != null)
+            citizens.put(citizenId, citizen.withOrder(Optional.empty()));
+    }
+
+    public void recordProgress(UUID orderId, int amount) {
+        var order = orders.get(orderId);
+        if (order != null)
+            orders.put(orderId, order.withProgress(order.progress() + amount));
+    }
+
+    /** Stores why no work happens. Returns true when the reason changed, so callers only log changes. */
+    public boolean markBlocked(UUID orderId, String reason) {
+        var order = orders.get(orderId);
+        if (order == null || order.blocked().filter(reason::equals).isPresent())
+            return false;
+        orders.put(orderId, order.withBlocked(Optional.of(reason)));
+        return true;
+    }
+
+    public void completeOrder(UUID orderId) {
+        var order = orders.get(orderId);
+        if (order == null || !order.status().open())
+            return;
+        orders.put(orderId, order.withStatus(OrderStatus.DONE));
+        releaseWorkers(orderId);
+    }
+
+    public void setMaterialized(UUID citizenId, boolean materialized) {
+        var citizen = citizens.get(citizenId);
+        if (citizen != null)
+            citizens.put(citizenId, citizen.withMaterialized(materialized));
+    }
+
+    /** A citizen died: it leaves the kingdom for good. */
+    public void removeCitizen(UUID citizenId) {
+        citizens.remove(citizenId);
+    }
+
+    private void releaseWorkers(UUID orderId) {
+        for (var c : List.copyOf(citizens.values()))
+            if (c.order().filter(orderId::equals).isPresent())
+                citizens.put(c.id(), c.withOrder(Optional.empty()));
     }
 
     /**
@@ -252,6 +432,17 @@ public final class KingdomState {
             else if (!home.kingdom().equals(c.kingdom()))
                 problems.add("Citizen " + c.name() + " (" + c.id() + ") lives in a settlement of another kingdom");
         }
+        for (var o : sorted(orders.values(), Order::id))
+            if (!kingdoms.containsKey(o.kingdom()))
+                problems.add("Order " + o.shortId() + " belongs to missing kingdom " + o.kingdom());
+        for (var c : sorted(citizens.values(), Citizen::id))
+            c.order().ifPresent(id -> {
+                var o = orders.get(id);
+                if (o == null)
+                    problems.add("Citizen " + c.name() + " (" + c.id() + ") works on missing order " + id);
+                else if (!o.kingdom().equals(c.kingdom()))
+                    problems.add("Citizen " + c.name() + " (" + c.id() + ") works on an order of another kingdom");
+            });
         for (var claim : claims.all())
             if (!kingdoms.containsKey(claim.kingdom()))
                 problems.add("Chunk " + ChunkKey.x(claim.chunk()) + "," + ChunkKey.z(claim.chunk()) + " in " + claim.dimension()
@@ -266,6 +457,20 @@ public final class KingdomState {
         if (kingdom == null)
             throw new KingdomException("kingdoms.error.no_kingdom");
         return kingdom;
+    }
+
+    private Citizen requireCitizen(UUID kingdomId, UUID citizenId) {
+        var citizen = citizens.get(citizenId);
+        if (citizen == null || !citizen.kingdom().equals(kingdomId))
+            throw new KingdomException("kingdoms.error.unknown_citizen");
+        return citizen;
+    }
+
+    private Order requireOrder(UUID kingdomId, UUID orderId) {
+        var order = orders.get(orderId);
+        if (order == null || !order.kingdom().equals(kingdomId))
+            throw new KingdomException("kingdoms.error.unknown_order");
+        return order;
     }
 
     private String ownerName(String dimension, long chunk) {

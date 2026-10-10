@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:function",
+  "function": "kingdoms:citizens_become_npcs",
+  "environment": "kingdoms:citizens_become_npcs",
+  "structure": "kingdoms:workshop",
+  "max_ticks": 600
+}

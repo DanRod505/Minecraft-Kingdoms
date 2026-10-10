@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:function",
+  "function": "kingdoms:carrier_hauls_items",
+  "environment": "kingdoms:carrier_hauls_items",
+  "structure": "kingdoms:workshop",
+  "max_ticks": 1500
+}

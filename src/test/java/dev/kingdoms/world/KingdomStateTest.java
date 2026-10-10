@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class KingdomStateTest {
     private static final String OVERWORLD = "minecraft:overworld";
-    private static final KingdomRules RULES = new KingdomRules(5, 1, 12);
+    private static final KingdomRules RULES = new KingdomRules(5, 1, 12, 4096);
 
     private final UUID alice = new UUID(0, 1);
     private final UUID bob = new UUID(0, 2);

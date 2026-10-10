@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:function",
+  "function": "kingdoms:farmer_harvests_and_replants",
+  "environment": "kingdoms:farmer_harvests_and_replants",
+  "structure": "kingdoms:workshop",
+  "max_ticks": 1500
+}

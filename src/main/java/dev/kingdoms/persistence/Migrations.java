@@ -31,8 +31,16 @@ public final class Migrations {
     private static <T> Dynamic<T> step(Dynamic<T> data, int fromVersion) {
         return switch (fromVersion) {
             case 1 -> v1ToV2(data);
+            case 2 -> v2ToV3(data);
             default -> throw new IllegalStateException("Missing migration step from v" + fromVersion);
         };
+    }
+
+    /** Phase 2: orders appear; citizens learn their order and whether their NPC exists yet. */
+    private static <T> Dynamic<T> v2ToV3(Dynamic<T> data) {
+        var citizens = data.get("citizens").asList(c -> c.set("materialized", c.createBoolean(false)));
+        return data.set("citizens", data.createList(citizens.stream()))
+            .set("orders", data.createList(java.util.stream.Stream.empty()));
     }
 
     /** Phase 1: the world state gains kingdoms, settlements, citizens and claims, all empty. */

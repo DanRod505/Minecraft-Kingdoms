@@ -3,6 +3,7 @@ package dev.kingdoms.core;
 import dev.kingdoms.KingdomsMod;
 import dev.kingdoms.block.RoyalStandardBlock;
 import dev.kingdoms.block.RoyalStandardItem;
+import dev.kingdoms.item.RoyalScepterItem;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
@@ -30,6 +31,9 @@ public final class KingdomsRegistry {
     public static final RegistryObject<Item> ROYAL_STANDARD_ITEM = ITEMS.register("royal_standard",
         () -> new RoyalStandardItem(ROYAL_STANDARD.get(), new Item.Properties().setId(ITEMS.key("royal_standard")).stacksTo(1)));
 
+    public static final RegistryObject<Item> ROYAL_SCEPTER = ITEMS.register("royal_scepter",
+        () -> new RoyalScepterItem(new Item.Properties().setId(ITEMS.key("royal_scepter")).stacksTo(1)));
+
     private KingdomsRegistry() {}
 
     public static void register(BusGroup modBus) {
@@ -38,6 +42,8 @@ public final class KingdomsRegistry {
         BuildCreativeModeTabContentsEvent.BUS.addListener(event -> {
             if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS)
                 event.accept(ROYAL_STANDARD_ITEM);
+            if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES)
+                event.accept(ROYAL_SCEPTER);
         });
     }
 }

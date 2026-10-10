@@ -6,7 +6,7 @@
 - Servidor é a autoridade (regra 20.8). O cliente só exibe e pede.
 - Todo dado salvo passa por `VersionedCodec` e carrega `schema_version`. Mudou o formato: sobe `SchemaVersion.CURRENT` e adiciona um passo em `Migrations` com teste.
 - Toda mudança de mensagem de rede sobe `KingdomsNetwork.PROTOCOL_VERSION`.
-- Testes de jogo: função registrada em `KingdomsGameTests` + `data/kingdoms/test_instance/<nome>.json`.
+- Testes de jogo: função registrada em `KingdomsGameTests.TEST_FUNCTIONS` (Fase 2: `WorkerGameTests`) + `data/kingdoms/test_instance/<nome>.json`. Teste que funda reino e dura vários ticks ganha um `test_environment` próprio, para rodar no seu lote (reinos ocupam chunks inteiros), e limpa o reino com `helper.addCleanup`.
 - Versões travadas: Minecraft 26.2, Forge 65.1.0, ForgeGradle 7.0.40, Gradle 9.5.0 (wrapper), Java 25. Mudança só com aprovação do Dalton.
 - Cada fase fecha com `docs/fase-N-relatorio.md`: checklist de aceite, testes, baseline de desempenho e pendências.
 
