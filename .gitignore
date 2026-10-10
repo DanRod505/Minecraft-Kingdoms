@@ -8,3 +8,9 @@ runs/
 .vscode/
 bin/
 logs/
+run-data/
+run-gametest/
+*.launch
+.settings/
+.classpath
+.project

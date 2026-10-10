@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:function",
+  "function": "kingdoms:world_state_round_trip",
+  "environment": "minecraft:default",
+  "structure": "kingdoms:empty",
+  "max_ticks": 100
+}

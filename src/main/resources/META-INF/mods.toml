@@ -1,0 +1,25 @@
+modLoader="javafml"
+loaderVersion="[65,)"
+license="All Rights Reserved"
+issueTrackerURL="https://github.com/DanRod505/Minecraft-Kingdoms/issues"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+authors="Dalton"
+description='''Govern a kingdom: found a capital, organize subjects, economy, government, diplomacy and war.'''
+
+[[dependencies.${mod_id}]]
+    modId="forge"
+    mandatory=true
+    versionRange="[${forge_version},)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[${minecraft_version},26.3)"
+    ordering="NONE"
+    side="BOTH"
