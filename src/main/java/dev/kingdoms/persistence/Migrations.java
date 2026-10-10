@@ -29,7 +29,18 @@ public final class Migrations {
     }
 
     private static <T> Dynamic<T> step(Dynamic<T> data, int fromVersion) {
-        // No migrations exist yet: v1 is the first schema.
-        throw new IllegalStateException("Missing migration step from v" + fromVersion);
+        return switch (fromVersion) {
+            case 1 -> v1ToV2(data);
+            default -> throw new IllegalStateException("Missing migration step from v" + fromVersion);
+        };
+    }
+
+    /** Phase 1: the world state gains kingdoms, settlements, citizens and claims, all empty. */
+    private static <T> Dynamic<T> v1ToV2(Dynamic<T> data) {
+        var empty = data.createList(java.util.stream.Stream.empty());
+        return data.set("kingdoms", empty)
+            .set("settlements", empty)
+            .set("citizens", empty)
+            .set("claims", empty);
     }
 }

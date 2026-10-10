@@ -1,0 +1,18 @@
+{
+  "minecraft": {
+    "version": "${minecraft_version}",
+    "modLoaders": [
+      {
+        "id": "forge-${forge_version}",
+        "primary": true
+      }
+    ]
+  },
+  "manifestType": "minecraftModpack",
+  "manifestVersion": 1,
+  "name": "${mod_name} (dev ${mod_version})",
+  "version": "${mod_version}",
+  "author": "Dalton",
+  "files": [],
+  "overrides": "overrides"
+}

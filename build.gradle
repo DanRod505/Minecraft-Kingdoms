@@ -93,3 +93,23 @@ tasks.named('jar', Jar) {
         'Implementation-Version'  : mod_version,
     ])
 }
+
+// Profile for CurseForge's "Import" (Create Custom Profile > Import): Minecraft + Forge versions in
+// manifest.json, and this build's jar in overrides/mods. Output: build/distributions/.
+def curseforgeProperties = replaceProperties
+tasks.register('curseforgeProfile', Zip) {
+    group = 'distribution'
+    description = 'Builds a CurseForge profile zip with this mod.'
+    archiveFileName = "kingdoms-${mod_version}-curseforge.zip"
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+    inputs.properties(curseforgeProperties)
+
+    from('curseforge') {
+        expand(curseforgeProperties)
+    }
+    from(tasks.named('jar')) {
+        into 'overrides/mods'
+    }
+}

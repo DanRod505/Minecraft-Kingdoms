@@ -18,3 +18,4 @@
 | `./gradlew runGameTestServer` | Sobe o servidor de testes de jogo; sai com erro se algum teste obrigatório falhar |
 | `scripts/server-smoke.sh` | Sobe o servidor dedicado (`runServer --nogui`), espera "Done", envia `stop` e falha se o mod logar erro |
 | `./gradlew runClient` | Abre o cliente de desenvolvimento |
+| `./gradlew curseforgeProfile` | Gera o zip de perfil para importar no CurseForge |

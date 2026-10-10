@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "G": "minecraft:gold_ingot",
+    "B": "#minecraft:banners",
+    "L": "#minecraft:logs"
+  },
+  "pattern": [
+    "GBG",
+    " L ",
+    " L "
+  ],
+  "result": {
+    "id": "kingdoms:royal_standard"
+  }
+}
