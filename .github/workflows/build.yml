@@ -1,0 +1,54 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      # Gradle itself runs on 21; the build provisions the Java 25 toolchain the MDK asks for.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            25
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build and unit tests
+        run: ./gradlew build curseforgeProfile --console=plain
+
+      - name: Game tests
+        run: ./gradlew runGameTestServer --console=plain
+
+      - name: Dedicated server smoke test
+        run: scripts/server-smoke.sh build/server-smoke.log
+
+      - name: Reproducible jar
+        run: |
+          sha256sum build/libs/*.jar | tee first.sha
+          ./gradlew clean build --console=plain --no-build-cache
+          sha256sum -c first.sha
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kingdoms-build
+          path: |
+            build/libs/*.jar
+            build/distributions/*.zip
+            build/reports/
+            build/server-smoke.log
+            run-gametest/logs/
+          if-no-files-found: ignore

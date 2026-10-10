@@ -1,0 +1,115 @@
+// Based on the Forge MDK forge-26.2-65.1.0-mdk. See docs/fase-0-relatorio.md for what was kept and why.
+
+plugins {
+    id 'java'
+    id 'idea'
+    id 'eclipse'
+    id 'net.minecraftforge.gradle' version '7.0.40'
+}
+
+version = mod_version
+group = mod_group
+base.archivesName = mod_id
+
+// Mojang ships Java 25 to end users in 26.1+, so the mod targets Java 25 (from the MDK).
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+// Include generated resources
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+minecraft {
+    runs {
+        configureEach {
+            workingDir = layout.projectDirectory.dir('run')
+
+            systemProperty 'eventbus.api.strictRuntimeChecks', 'true'
+            systemProperty 'forge.enabledGameTestNamespaces', mod_id
+        }
+
+        register('client')
+
+        register('server') {
+            args '--nogui'
+        }
+
+        register('gameTestServer') {
+            workingDir = layout.projectDirectory.dir('run-gametest')
+        }
+
+        register('data') {
+            workingDir = layout.projectDirectory.dir('run-data')
+
+            args '--mod', mod_id, '--all', '--output', layout.projectDirectory.dir('src/generated/resources'), '--existing', layout.projectDirectory.dir('src/main/resources')
+        }
+    }
+}
+
+repositories {
+    minecraft.mavenizer(it)
+    maven fg.forgeMaven
+    maven fg.minecraftLibsMaven
+    mavenCentral()
+}
+
+dependencies {
+    implementation minecraft.dependency("net.minecraftforge:forge:${minecraft_version}-${forge_version}")
+    annotationProcessor 'net.minecraftforge:eventbus-validator:7.0.5'
+
+    testImplementation platform('org.junit:junit-bom:5.13.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('test', Test) {
+    useJUnitPlatform()
+}
+
+def replaceProperties = [
+    minecraft_version: minecraft_version,
+    forge_version: forge_version,
+    mod_id: mod_id,
+    mod_name: mod_name,
+    mod_version: mod_version,
+]
+tasks.named('processResources', ProcessResources) {
+    inputs.properties(replaceProperties)
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand(replaceProperties)
+    }
+}
+
+tasks.named('jar', Jar) {
+    // Reproducible archives (GDD 16, Phase 0: build reproduzível)
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+    manifest.attributes([
+        'Specification-Title'     : mod_id,
+        'Specification-Version'   : '1',
+        'Implementation-Title'    : mod_name,
+        'Implementation-Version'  : mod_version,
+    ])
+}
+
+// Profile for CurseForge's "Import" (Create Custom Profile > Import): Minecraft + Forge versions in
+// manifest.json, and this build's jar in overrides/mods. Output: build/distributions/.
+def curseforgeProperties = replaceProperties
+tasks.register('curseforgeProfile', Zip) {
+    group = 'distribution'
+    description = 'Builds a CurseForge profile zip with this mod.'
+    archiveFileName = "kingdoms-${mod_version}-curseforge.zip"
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+    inputs.properties(curseforgeProperties)
+
+    from('curseforge') {
+        expand(curseforgeProperties)
+    }
+    from(tasks.named('jar')) {
+        into 'overrides/mods'
+    }
+}

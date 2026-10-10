@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:function",
+  "function": "kingdoms:miner_digs_area",
+  "environment": "kingdoms:miner_digs_area",
+  "structure": "kingdoms:workshop",
+  "max_ticks": 2400
+}

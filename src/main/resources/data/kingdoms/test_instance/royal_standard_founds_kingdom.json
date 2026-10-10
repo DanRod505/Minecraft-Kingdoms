@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:function",
+  "function": "kingdoms:royal_standard_founds_kingdom",
+  "environment": "minecraft:default",
+  "structure": "kingdoms:empty",
+  "max_ticks": 100
+}

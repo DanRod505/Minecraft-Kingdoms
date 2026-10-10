@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "end": "kingdoms:block/royal_standard_top",
+    "side": "kingdoms:block/royal_standard_side"
+  }
+}
